@@ -1,0 +1,151 @@
+import discord
+from discord.ext import commands
+
+# COLOQUE O TOKEN DO SEU BOT AQUI
+TOKEN = "coloque seu token aqui"
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Perguntas do quiz
+perguntas = [
+    {
+        "pergunta": "🌳 O que é melhor para o meio ambiente?\n\nA) Plantar árvores\nB) Fazer queimadas",
+        "correta": "a"
+    },
+    {
+        "pergunta": "♻️ O lixo reciclável deve ser:\n\nA) Misturado com lixo comum\nB) Separado corretamente",
+        "correta": "b"
+    },
+    {
+        "pergunta": "💧 Para economizar água devemos:\n\nA) Fechar a torneira ao escovar os dentes\nB) Deixar a torneira aberta",
+        "correta": "a"
+    },
+    {
+        "pergunta": "🚲 Qual transporte polui menos?\n\nA) Bicicleta\nB) Carro",
+        "correta": "a"
+    },
+    {
+        "pergunta": "⚡ Qual energia é renovável?\n\nA) Solar\nB) Carvão",
+        "correta": "a"
+    }
+]
+
+pontuacoes = {}
+pergunta_atual = {}
+
+
+@bot.event
+async def on_ready():
+    print(f"Bot conectado como {bot.user}")
+
+
+@bot.command()
+async def oibot(ctx):
+    await ctx.send(
+        "👋 **Olá! Eu sou o Bot do Quiz do Meio Ambiente!** 🌎\n\n"
+        "Meu objetivo é testar seus conhecimentos sobre sustentabilidade.\n\n"
+        "📚 **Como jogar:**\n"
+        "Digite **!quiz** para começar.\n\n"
+        "Responda às perguntas digitando apenas **A** ou **B**.\n\n"
+        "🏆 No final você receberá um cargo de acordo com sua pontuação!"
+    )
+
+
+@bot.command()
+async def quiz(ctx):
+
+    pontuacoes[ctx.author.id] = 0
+    pergunta_atual[ctx.author.id] = 0
+
+    await ctx.send("🌎 **Quiz do Meio Ambiente** 🌎")
+    await enviar_pergunta(ctx)
+
+
+async def enviar_pergunta(ctx):
+
+    indice = pergunta_atual[ctx.author.id]
+
+    if indice >= len(perguntas):
+
+        pontos = pontuacoes[ctx.author.id]
+
+        guild = ctx.guild
+        membro = ctx.author
+
+        nomes_cargos = [
+            "🗑️ Poluidor",
+            "🌱 Aprendiz Ambiental",
+            "🌳 Guardião da Natureza",
+            "🌍 Herói do Meio Ambiente"
+        ]
+
+        # Remove cargos antigos
+        for nome in nomes_cargos:
+            cargo = discord.utils.get(guild.roles, name=nome)
+            if cargo and cargo in membro.roles:
+                await membro.remove_roles(cargo)
+
+        # Define novo cargo
+        if pontos <= 1:
+            novo_cargo = "🗑️ Poluidor"
+        elif pontos <= 3:
+            novo_cargo = "🌱 Aprendiz Ambiental"
+        elif pontos == 4:
+            novo_cargo = "🌳 Guardião da Natureza"
+        else:
+            novo_cargo = "🌍 Herói do Meio Ambiente"
+
+        cargo = discord.utils.get(guild.roles, name=novo_cargo)
+
+        if cargo:
+            await membro.add_roles(cargo)
+
+        await ctx.send(
+            f"🏆 **QUIZ FINALIZADO!**\n\n"
+            f"📚 Acertos: **{pontos}/{len(perguntas)}**\n"
+            f"🎖️ Cargo conquistado: **{novo_cargo}**\n\n"
+            f"🌎 Obrigado por ajudar o meio ambiente!"
+        )
+
+        del pontuacoes[ctx.author.id]
+        del pergunta_atual[ctx.author.id]
+        return
+
+    await ctx.send(
+        f"**Pergunta {indice + 1}/{len(perguntas)}**\n\n"
+        f"{perguntas[indice]['pergunta']}"
+    )
+
+
+@bot.event
+async def on_message(message):
+
+    if message.author.bot:
+        return
+
+    if message.author.id in pergunta_atual:
+
+        resposta = message.content.lower()
+
+        if resposta in ["a", "b"]:
+
+            indice = pergunta_atual[message.author.id]
+
+            if resposta == perguntas[indice]["correta"]:
+                pontuacoes[message.author.id] += 1
+                await message.channel.send("✅ Correto!")
+            else:
+                await message.channel.send("❌ Resposta incorreta!")
+
+            pergunta_atual[message.author.id] += 1
+
+            ctx = await bot.get_context(message)
+            await enviar_pergunta(ctx)
+
+    await bot.process_commands(message)
+
+
+bot.run(TOKEN)
